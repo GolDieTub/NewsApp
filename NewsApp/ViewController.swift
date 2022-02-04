@@ -7,20 +7,21 @@
 
 import UIKit
 import SafariServices
+import Foundation
 
-class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UISearchBarDelegate {
+class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UISearchBarDelegate{
     
     private let tableView: UITableView = {
         let table = UITableView()
         table.register(NewsTableViewCell.self, forCellReuseIdentifier: NewsTableViewCell.identifier)
         return table
     }()
-    
+    private var buttonTags = Array(repeating: false, count: 20)
     private let searchVC = UISearchController(searchResultsController: nil)
     private var articles = [Article]()
     private var viewModels = [NewsTableViewCellViewModel]()
 
-    
+    public var likedPosts: [[String:Any]] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -33,7 +34,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         tableView.refreshControl?.addTarget(self, action: #selector(refresh(_:)), for: .valueChanged)
         
         view.backgroundColor = .systemBackground
-
+        //loadData()
         fetchTopStories()
         createSearchBar()
 
@@ -47,20 +48,43 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
                 self?.viewModels = articles.compactMap({
                     NewsTableViewCellViewModel(
                         title: $0.title,
-                        subTitle: $0.description ?? "No Description",
+                        description: $0.description ?? "No Description",
                         imageURL: URL(string: $0.urlToImage ?? ""))
                 })
                 DispatchQueue.main.async {
                     self?.tableView.refreshControl?.endRefreshing()
+                    self?.tableView.reloadData()
                 }
             case .failure(let error):
                 print(error)
             }
         }
-        DispatchQueue.main.async {
-            self.tableView.reloadData()
-        }
 
+    }
+    
+    @objc func didTapCellButton(sender: UIButton) {
+        let buttonTag = sender.tag
+        if buttonTags[sender.tag] == false{
+            buttonTags[sender.tag] = true
+            sender.setImage(UIImage(systemName: "heart.fill"), for: .normal)
+        } else if buttonTags[sender.tag] == true{
+            buttonTags[sender.tag] = false
+            sender.setImage(UIImage(systemName: "heart"), for: .normal)
+            
+        }
+//        UserDefaults.standard.set(articles[buttonTag].url, forKey: "LikesKey")
+//        UserDefaults.standard.synchronize()
+
+    }
+    
+    func loadData(){
+        
+        if let array = UserDefaults.standard.array(forKey: "LikesKey") as? [[String:Any]]{
+            likedPosts = array
+        } else {
+            likedPosts = []
+        }
+        print(likedPosts)
     }
     
     private func createSearchBar(){
@@ -76,7 +100,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
                 self?.viewModels = articles.compactMap({
                     NewsTableViewCellViewModel(
                         title: $0.title,
-                        subTitle: $0.description ?? "No Description",
+                        description: $0.description ?? "No Description",
                         imageURL: URL(string: $0.urlToImage ?? ""))
                 })
                 DispatchQueue.main.async {
@@ -86,10 +110,9 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
                 print(error)
             }
         }
+        
     }
     
-    
-    //Table
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int{
         return viewModels.count
     }
@@ -108,6 +131,14 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
                     fatalError()
                 }
         cell.configure(with: viewModels[indexPath.row])
+        cell.likeButton.tag = indexPath.row
+                cell.likeButton.addTarget(self, action: #selector(didTapCellButton(sender:)), for: .touchUpInside)
+        if (cell.descriptionLabel.text?.count ?? 0 > 80){
+            cell.showMoreLabel.textColor = .systemBlue
+        }
+        else{
+            cell.showMoreLabel.textColor = .systemBackground
+        }
         return cell
     }
     
@@ -123,7 +154,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
         present(vc, animated: true)
     }
     
-    //search
+    
     
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         guard let text = searchBar.text else {
@@ -136,7 +167,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
                     self?.viewModels = articles.compactMap({
                         NewsTableViewCellViewModel(
                             title: $0.title,
-                            subTitle: $0.description ?? "No Description",
+                            description: $0.description ?? "No Description",
                             imageURL: URL(string: $0.urlToImage ?? ""))
                     })
                     DispatchQueue.main.async {
